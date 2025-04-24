@@ -4,51 +4,56 @@ import { Buffer } from "node:buffer";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
-// Define time periods
+// Define time periods (examples removed)
 interface TimePeriod {
   id: string;
   name: string;
   prompt: string;
+  // examples property removed
 }
 
 const TIME_PERIODS: TimePeriod[] = [
   {
     id: "prehistoric",
-    name: "Jurassic",
-    prompt: "prehistoric Jurassic era with dinosaurs"
+    name: "Prehistoric",
+    prompt: "prehistoric era",
   },
   {
-    id: "medieval", 
+    id: "ancient-egypt", 
+    name: "Ancient Egypt",
+    prompt: "ancient Egyptian civilization",
+  },
+  {
+    id: "roman-empire",
+    name: "Roman Empire",
+    prompt: "ancient Roman civilization",
+  },
+  {
+    id: "medieval",
     name: "Medieval",
-    prompt: "medieval times with castles and knights"
+    prompt: "medieval Europe",
   },
   {
-    id: "western",
-    name: "Wild West",
-    prompt: "wild west frontier with cowboys"
+    id: "renaissance",
+    name: "Renaissance",
+    prompt: "Renaissance period",
+  },
+  {
+    id: "victorian",
+    name: "Victorian",
+    prompt: "Victorian era",
+  },
+  {
+    id: "roaring-twenties",
+    name: "1920s",
+    prompt: "Roaring Twenties",
   },
   {
     id: "future",
-    name: "Future",
-    prompt: "futuristic city with flying cars and advanced technology"
-  },
-  {
-    id: "space",
-    name: "Space",
-    prompt: "outer space with stars, planets and spaceships"
-  },
-  {
-    id: "pirate",
-    name: "Pirates",
-    prompt: "pirate ship on the high seas in the golden age of piracy"
+    name: "Future (Year 3030)",
+    prompt: "year 3030",
   }
 ];
-
-// Middleware for debugging requests
-app.use("*", async (c, next) => {
-  console.log(`[${new Date().toISOString()}] ${c.req.method} ${c.req.url}`);
-  await next();
-});
 
 // Health check endpoint
 app.get("/api/health", (c) => {
@@ -100,7 +105,8 @@ app.post("/api/time-travel", async (c) => {
       apiKey: apiKey,
     });
     
-    const promptText = `Transform this person or scene to a photorealistic image of ${period.prompt}. Keep the person's facial features and scene settings recognizable but transform them to ${period.prompt}.`;
+    // Revised prompt without examples, emphasizing adaptation
+    const promptText = `Transform the provided image into a photorealistic scene taking place in the ${period.prompt}. **It is essential to retain the original subjects' identity, features, and the overall composition of the scene.** Modify the setting, clothing, and surrounding elements to accurately reflect the style and atmosphere of the ${period.prompt}. The final image should clearly show the original subject transported to this different time period.`;
     console.log("Using prompt:", promptText);
     
     try {
@@ -115,7 +121,7 @@ app.post("/api/time-travel", async (c) => {
       
       // Use the OpenAI SDK to call the image edit endpoint
       const result = await openai.images.edit({
-        model: "gpt-image-1",
+        model: "gpt-image-1", 
         image: imageFile,
         prompt: promptText
       });

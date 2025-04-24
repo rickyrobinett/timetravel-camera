@@ -16,6 +16,127 @@
         touch-action: manipulation;
       }
       
+      /* Gallery overlay styles */
+      .gallery-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.9);
+        z-index: 100;
+        display: none;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      
+      .gallery-header {
+        height: 60px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 20px;
+        background-color: rgba(0, 0, 0, 0.8);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      
+      .gallery-title {
+        color: white;
+        font-size: 18px;
+        font-weight: 600;
+      }
+      
+      .gallery-close {
+        color: white;
+        background: none;
+        border: none;
+        font-size: 16px;
+        padding: 8px 16px;
+        border-radius: 16px;
+        background-color: rgba(255, 255, 255, 0.2);
+        cursor: pointer;
+      }
+      
+      .gallery-grid {
+        flex: 1;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        padding: 8px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      .gallery-item {
+        aspect-ratio: 1/1;
+        background-color: #222;
+        border-radius: 8px;
+        overflow: hidden;
+        position: relative;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+      }
+      
+      .gallery-item:active {
+        transform: scale(0.95);
+      }
+      
+      .gallery-item-actions {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 40px;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        transition: opacity 0.2s ease;
+        opacity: 0;
+      }
+      
+      .gallery-item:hover .gallery-item-actions {
+        opacity: 1;
+      }
+      
+      .gallery-action-btn {
+        color: white;
+        background: none;
+        border: none;
+        font-size: 14px;
+        padding: 6px 12px;
+        border-radius: 12px;
+        background-color: rgba(255, 255, 255, 0.2);
+        cursor: pointer;
+      }
+      
+      .gallery-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      
+      .gallery-loading {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: rgba(0, 0, 0, 0.5);
+        color: white;
+        font-size: 14px;
+      }
+      
+      .gallery-empty {
+        color: white;
+        text-align: center;
+        padding: 40px;
+        grid-column: span 3;
+      }
+      
       html, body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         background-color: #000;
@@ -50,7 +171,7 @@
       .camera-feed {
         width: 100%;
         height: 100%;
-        object-fit: cover;
+        object-fit: cover; /* Back to cover to fill the screen */
         background-color: #1a1a1a;
         display: block; /* Ensure it's displayed */
         z-index: 1; /* Make sure it's properly layered */
@@ -177,7 +298,7 @@
         bottom: 0;
         left: 0;
         right: 0;
-        height: 170px;
+        height: 150px;
         padding: 20px;
         display: flex;
         flex-direction: column;
@@ -373,9 +494,18 @@
         -webkit-backdrop-filter: blur(4px);
       }
       
-      @keyframes spin {
-        0% { transform: translate(-50%, -50%) rotate(0deg); }
-        100% { transform: translate(-50%, -50%) rotate(360deg); }
+      .loading-text::after {
+        content: '...';
+        display: inline-block;
+        width: 0;
+        animation: ellipsis 1.5s infinite;
+      }
+      
+      @keyframes ellipsis {
+        0% { content: '.'; }
+        33% { content: '..'; }
+        66% { content: '...'; }
+        100% { content: '.'; }
       }
       
       .status-text {
@@ -460,6 +590,17 @@
   </head>
   <body>
     <div class="camera-container">
+      <!-- Gallery overlay -->
+      <div class="gallery-overlay" id="gallery-overlay">
+        <div class="gallery-header">
+          <div class="gallery-title">Time Travel Photos</div>
+          <button class="gallery-close" id="gallery-close">Close</button>
+        </div>
+        <div class="gallery-grid" id="gallery-grid">
+          <!-- Gallery items will be loaded here -->
+          <div class="gallery-empty">Loading photos...</div>
+        </div>
+      </div>
       <div class="viewfinder">
         <video class="camera-feed" id="camera-feed" autoplay playsinline></video>
         <img id="captured-image" />
@@ -872,11 +1013,15 @@
         async function initCamera() {
           try {
             log('Initializing camera...');
+            // Use a specific aspect ratio to avoid zoom issues
+            const aspectRatio = window.innerWidth / window.innerHeight;
+            
             // Make sure to use a simplified approach that works more reliably
             const constraints = {
               video: {
-                width: { ideal: window.innerWidth },
-                height: { ideal: window.innerHeight },
+                width: { min: 720, ideal: 1280, max: 1920 },
+                height: { min: 720, ideal: 1280, max: 1920 },
+                aspectRatio: { ideal: aspectRatio },
                 facingMode: facingMode // Use current camera selection
               }
             };
@@ -885,7 +1030,7 @@
             cameraFeed.style.display = 'block';
             cameraFeed.style.width = '100%';
             cameraFeed.style.height = '100%';
-            cameraFeed.style.objectFit = 'cover';
+            cameraFeed.style.objectFit = 'cover'; // Back to cover for full screen
             cameraFeed.style.zIndex = '1';
             
             // Request camera access
@@ -916,11 +1061,44 @@
           }
         }
         
+        // Function to load the most recent image as the thumbnail
+        async function loadLatestImageAsThumbnail() {
+          try {
+            log('Loading most recent image for thumbnail...');
+            
+            const response = await fetch('/api/images');
+            if (!response.ok) {
+              throw new Error(`Error loading images: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.images && data.images.length > 0) {
+              // Sort images by upload date (newest first)
+              const sortedImages = data.images.sort((a, b) => {
+                return new Date(b.uploaded) - new Date(a.uploaded);
+              });
+              
+              // Use the first (newest) image as thumbnail
+              if (sortedImages[0]) {
+                thumbnail.src = sortedImages[0].url;
+                log('Set thumbnail to most recent image: ' + sortedImages[0].key);
+              }
+            }
+          } catch (error) {
+            log(`Error loading thumbnail: ${error.message}`);
+            // Continue without thumbnail - non-critical feature
+          }
+        }
+
         // Initialize app first, then camera
         (async function startApp() {
           try {
             // First initialize the app (fetch time periods)
             await initialize();
+            
+            // Try to load the most recent image as thumbnail
+            loadLatestImageAsThumbnail();
             
             // Then initialize the camera with a slight delay
             setTimeout(() => {
@@ -1144,6 +1322,46 @@
           
           // Disable the shutter button while loading
           shutterButton.disabled = isLoading;
+
+          // Set up loading messages if loading
+          if (isLoading) {
+            const loadingMessages = [
+              "Warping through the space-time continuum",
+              "Adjusting temporal coordinates",
+              "Calibrating quantum flux capacitor",
+              "Reversing polarity of neutron flow",
+              "Engaging chrono-displacement field",
+              "Synchronizing temporal harmonics",
+              "Bending the fabric of spacetime",
+              "Aligning temporal resonance",
+              "Calculating temporal trajectory",
+              "Initializing time vortex"
+            ];
+
+            // Start with first message
+            let messageIndex = 0;
+            loadingText.textContent = loadingMessages[messageIndex];
+
+            // Change message every 2 seconds
+            const messageInterval = setInterval(() => {
+              if (!isLoading) {
+                clearInterval(messageInterval);
+                return;
+              }
+              
+              messageIndex = (messageIndex + 1) % loadingMessages.length;
+              loadingText.textContent = loadingMessages[messageIndex];
+            }, 2000);
+
+            // Store interval ID to clear it later
+            loadingText.dataset.intervalId = messageInterval;
+          } else {
+            // Clear the message interval if it exists
+            if (loadingText.dataset.intervalId) {
+              clearInterval(Number(loadingText.dataset.intervalId));
+              loadingText.dataset.intervalId = "";
+            }
+          }
         }
         
         // Show status message
@@ -1158,7 +1376,7 @@
         }
         
         // Show captured image
-        function showImage(imageUrl) {
+        function showImage(imageUrl, fromGallery = false) {
           capturedImage.src = imageUrl;
           capturedImage.style.display = 'block';
           cameraFeed.style.display = 'none';
@@ -1167,6 +1385,32 @@
           // Set as thumbnail too
           thumbnail.src = imageUrl;
           lastCapturedImage = imageUrl;
+          
+          // Store if we came from gallery to return there instead of camera
+          capturedImage.dataset.fromGallery = fromGallery;
+          
+          // Auto-return after 5 seconds
+          const autoReturnTimeout = setTimeout(() => {
+            if (fromGallery) {
+              // Return to gallery if that's where we came from
+              openGallery();
+              log("Auto-returned to gallery after 5 seconds");
+            } else {
+              // Otherwise return to camera view
+              returnToCameraView();
+              log("Auto-returned to camera view after 5 seconds");
+            }
+          }, 5000);
+          
+          // Store the timeout ID so we can clear it if user returns manually
+          capturedImage.dataset.timeoutId = autoReturnTimeout;
+        }
+        
+        // Function to return to camera view
+        function returnToCameraView() {
+          capturedImage.style.display = 'none';
+          cameraFeed.style.display = 'block';
+          saveButton.style.display = 'none';
         }
         
         // Handle shutter button with enhanced mobile support
@@ -1217,11 +1461,15 @@
               currentStream.getTracks().forEach(track => track.stop());
             }
             
+            // Use a specific aspect ratio to avoid zoom issues
+            const aspectRatio = window.innerWidth / window.innerHeight;
+            
             // Update constraints with new facingMode
             const constraints = {
               video: {
-                width: { ideal: window.innerWidth },
-                height: { ideal: window.innerHeight },
+                width: { min: 720, ideal: 1280, max: 1920 },
+                height: { min: 720, ideal: 1280, max: 1920 },
+                aspectRatio: { ideal: aspectRatio },
                 facingMode: facingMode
               }
             };
@@ -1259,6 +1507,14 @@
         // Handle save button
         saveButton.addEventListener('click', () => {
           log('Saving image');
+          
+          // Clear the auto-return timeout if it exists
+          if (capturedImage.dataset.timeoutId) {
+            clearTimeout(Number(capturedImage.dataset.timeoutId));
+            capturedImage.dataset.timeoutId = "";
+            log("Cleared auto-return timeout due to save action");
+          }
+          
           // Create a download link for the image
           const link = document.createElement('a');
           link.download = `timetravel-${selectedPeriod ? selectedPeriod.id : 'photo'}-${Date.now()}.jpg`;
@@ -1270,18 +1526,191 @@
         
         // Debug button removed to match iOS camera app
         
-        // Handle thumbnail click to view last image
-        thumbnail.addEventListener('click', () => {
-          if (lastCapturedImage) {
-            showImage(lastCapturedImage);
+        // Gallery functionality
+        const galleryOverlay = document.getElementById('gallery-overlay');
+        const galleryGrid = document.getElementById('gallery-grid');
+        const galleryClose = document.getElementById('gallery-close');
+        
+        // Load images from R2 bucket
+        async function loadGalleryImages() {
+          try {
+            log('Loading gallery images from R2 bucket...');
+            galleryGrid.innerHTML = '<div class="gallery-empty">Loading photos...</div>';
+            
+            const response = await fetch('/api/images');
+            if (!response.ok) {
+              throw new Error(`Error loading images: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            log(`Loaded ${data.count} images from R2 bucket`);
+            
+            if (data.images && data.images.length > 0) {
+              // Clear grid
+              galleryGrid.innerHTML = '';
+              
+              // Sort images by upload date (newest first)
+              const sortedImages = data.images.sort((a, b) => {
+                return new Date(b.uploaded) - new Date(a.uploaded);
+              });
+              
+              // Add images to grid
+              sortedImages.forEach(image => {
+                const item = document.createElement('div');
+                item.className = 'gallery-item';
+                
+                const img = document.createElement('img');
+                img.className = 'gallery-img';
+                img.src = image.url;
+                img.loading = 'lazy';
+                img.alt = 'Time travel photo';
+                
+                // Create actions container for share/download buttons
+                const actionsContainer = document.createElement('div');
+                actionsContainer.className = 'gallery-item-actions';
+                
+                // Share button (only on supported browsers)
+                if (navigator.share) {
+                  const shareBtn = document.createElement('button');
+                  shareBtn.className = 'gallery-action-btn';
+                  shareBtn.textContent = 'Share';
+                  shareBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation(); // Prevent image click
+                    try {
+                      // Create a fetch request to get the image as a blob
+                      const response = await fetch(image.url);
+                      const blob = await response.blob();
+                      const file = new File([blob], `timetravel-photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
+                      
+                      await navigator.share({
+                        title: 'Time Travel Photo',
+                        text: 'Check out my time travel photo!',
+                        files: [file]
+                      });
+                      log('Shared image successfully');
+                    } catch (error) {
+                      log(`Error sharing image: ${error.message}`);
+                      showStatus('Could not share image. Try downloading instead.');
+                    }
+                  });
+                  actionsContainer.appendChild(shareBtn);
+                }
+                
+                // Download button
+                const downloadBtn = document.createElement('button');
+                downloadBtn.className = 'gallery-action-btn';
+                downloadBtn.textContent = 'Download';
+                downloadBtn.addEventListener('click', (e) => {
+                  e.stopPropagation(); // Prevent image click
+                  const link = document.createElement('a');
+                  link.download = `timetravel-photo-${Date.now()}.jpg`;
+                  link.href = image.url;
+                  link.click();
+                  log('Downloading image');
+                });
+                actionsContainer.appendChild(downloadBtn);
+                
+                // Click handler to view full image
+                item.addEventListener('click', () => {
+                  // Clear any timeout and show this image
+                  if (capturedImage.dataset.timeoutId) {
+                    clearTimeout(Number(capturedImage.dataset.timeoutId));
+                    capturedImage.dataset.timeoutId = "";
+                  }
+                  
+                  // Close gallery and show the selected image (with fromGallery=true)
+                  showImage(image.url, true);
+                  closeGallery();
+                });
+                
+                item.appendChild(img);
+                item.appendChild(actionsContainer);
+                galleryGrid.appendChild(item);
+              });
+            } else {
+              galleryGrid.innerHTML = '<div class="gallery-empty">No photos found. Take some time travel photos first!</div>';
+            }
+          } catch (error) {
+            log(`Error loading gallery: ${error.message}`);
+            galleryGrid.innerHTML = `<div class="gallery-empty">Error loading photos: ${error.message}</div>`;
+          }
+        }
+        
+        // Open gallery
+        function openGallery() {
+          galleryOverlay.style.display = 'flex';
+          loadGalleryImages();
+        }
+        
+        // Close gallery
+        function closeGallery() {
+          galleryOverlay.style.display = 'none';
+        }
+        
+        // Gallery close button
+        galleryClose.addEventListener('click', closeGallery);
+        
+        // Add keyboard support for gallery (Escape to close)
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && galleryOverlay.style.display === 'flex') {
+            closeGallery();
           }
         });
         
-        // Return to camera viewfinder when tapping on captured image
+        // Add swipe down to close gallery for mobile
+        let touchStartY = 0;
+        let touchEndY = 0;
+        
+        galleryOverlay.addEventListener('touchstart', (e) => {
+          touchStartY = e.touches[0].clientY;
+        }, { passive: true });
+        
+        galleryOverlay.addEventListener('touchmove', (e) => {
+          touchEndY = e.touches[0].clientY;
+        }, { passive: true });
+        
+        galleryOverlay.addEventListener('touchend', () => {
+          // If swiped down more than 100px, close the gallery
+          if (touchEndY - touchStartY > 100) {
+            closeGallery();
+          }
+          // Reset values
+          touchStartY = 0;
+          touchEndY = 0;
+        }, { passive: true });
+        
+        // Handle thumbnail click to open gallery
+        thumbnail.addEventListener('click', () => {
+          // Clear any existing auto-return timeout on the current image
+          if (capturedImage.dataset.timeoutId) {
+            clearTimeout(Number(capturedImage.dataset.timeoutId));
+            capturedImage.dataset.timeoutId = "";
+            log("Cleared previous auto-return timeout");
+          }
+          
+          // Open gallery to browse all photos from R2 bucket
+          openGallery();
+        });
+        
+        // Return to appropriate view when tapping on captured image
         capturedImage.addEventListener('click', () => {
-          capturedImage.style.display = 'none';
-          cameraFeed.style.display = 'block';
-          saveButton.style.display = 'none';
+          // Clear the auto-return timeout if it exists
+          if (capturedImage.dataset.timeoutId) {
+            clearTimeout(Number(capturedImage.dataset.timeoutId));
+            capturedImage.dataset.timeoutId = "";
+            log("Cleared auto-return timeout due to user tap");
+          }
+          
+          // Check if we should return to gallery or camera view
+          if (capturedImage.dataset.fromGallery === "true") {
+            // Return to gallery
+            openGallery();
+            log("Returned to gallery on user tap");
+          } else {
+            // Return to camera view
+            returnToCameraView();
+            log("Returned to camera view on user tap");
+          }
           
           // Mode selector is always visible now as part of bottom bar
         });
