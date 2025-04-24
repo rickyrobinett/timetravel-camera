@@ -123,7 +123,8 @@ app.post("/api/time-travel", async (c) => {
       const result = await openai.images.edit({
         model: "gpt-image-1", 
         image: imageFile,
-        prompt: promptText
+        prompt: promptText,
+        moderation: "low"
       });
       
       console.log("Successfully generated image");
