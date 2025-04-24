@@ -39,9 +39,9 @@ const TIME_PERIODS: TimePeriod[] = [
     prompt: "Renaissance period",
   },
   {
-    id: "victorian",
-    name: "Victorian",
-    prompt: "Victorian era",
+    id: "wild-west",
+    name: "Wild West",
+    prompt: "American Wild West era",
   },
   {
     id: "roaring-twenties",
