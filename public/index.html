@@ -1,19 +1,1291 @@
 <!doctype html>
 <html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Hello, World!</title>
-	</head>
-	<body>
-		<h1 id="heading"></h1>
-		<script>
-			fetch('/message')
-				.then((resp) => resp.text())
-				.then((text) => {
-					const h1 = document.getElementById('heading');
-					h1.textContent = text;
-				});
-		</script>
-	</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#000000" />
+    <title>Time Travel Camera</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+      }
+      
+      html, body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #000;
+        color: #fff;
+        height: 100%;
+        width: 100%;
+        overflow: hidden;
+        position: fixed;
+        margin: 0;
+        padding: 0;
+        overscroll-behavior: none;
+      }
+      
+      .camera-container {
+        height: 100%;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        padding-bottom: env(safe-area-inset-bottom, 0);
+        padding-bottom: constant(safe-area-inset-bottom, 0); /* iOS 11.0 */
+      }
+      
+      .viewfinder {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+        z-index: 1; /* Ensure proper layering */
+        background-color: #000; /* Black background */
+      }
+      
+      .camera-feed {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        background-color: #1a1a1a;
+        display: block; /* Ensure it's displayed */
+        z-index: 1; /* Make sure it's properly layered */
+      }
+      
+      .top-controls {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 80px;
+        padding: 16px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 2;
+        background: linear-gradient(to bottom, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0) 100%);
+      }
+      
+      .top-controls button {
+        background: none;
+        border: none;
+        color: #fff;
+        font-size: 20px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: rgba(0, 0, 0, 0.3);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+        transition: transform 0.2s ease, background-color 0.2s ease;
+        cursor: pointer;
+      }
+      
+      .top-controls button:hover, .top-controls button:active {
+        transform: scale(1.05);
+        background-color: rgba(0, 0, 0, 0.4);
+      }
+      
+      /* iOS-style time period selector - like the mode selector at the bottom */
+      /* Time periods container styles removed - using only mode selector */
+      
+      /* Time periods styles removed - using only mode selector */
+      
+      /* All time periods styles removed - using only mode selector */
+      
+      /* Mode selector styles */
+      .mode-selector {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 50px;
+        z-index: 45;
+        overflow: visible;
+        padding: 0;
+        pointer-events: auto;
+        display: flex;
+        justify-content: center;
+        touch-action: pan-x;
+      }
+      
+      .modes {
+        position: relative;
+        width: 100%;
+        height: 50px;
+        display: flex;
+        justify-content: flex-start;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-snap-type: x mandatory;
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding: 10px 0;
+        margin: 0;
+        scroll-padding: 0 40%;
+        background-color: transparent;
+        touch-action: pan-x;
+      }
+      
+      .modes::-webkit-scrollbar {
+        display: none;
+        width: 0;
+        height: 0;
+        background: transparent;
+      }
+      
+      .mode {
+        color: #fff;
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        padding: 8px 20px;
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 120px;
+        height: 40px;
+        transition: all 0.15s ease;
+        scroll-snap-align: center;
+        margin: 0 10px;
+        opacity: 0.7;
+        touch-action: manipulation;
+      }
+      
+      .mode.active {
+        font-weight: 600;
+        transform: scale(1.05);
+        opacity: 1;
+        position: relative;
+        color: #FFCC00;
+      }
+      
+      .bottom-controls {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 170px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: center;
+        z-index: 50;
+        background: rgba(0, 0, 0, 0.8);
+        touch-action: manipulation;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        padding-bottom: env(safe-area-inset-bottom, 20px);
+        padding-bottom: constant(safe-area-inset-bottom, 20px); /* iOS 11.0 */
+      }
+      
+      .controls-row {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+        margin-top: 15px;
+      }
+      
+      /* Position the thumbnail on the left */
+      .controls-row .thumbnail {
+        position: absolute;
+        left: 30px;
+      }
+      
+      .thumbnail {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        background-color: #333;
+        border: 1.5px solid rgba(255, 255, 255, 0.8);
+        object-fit: cover;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        transition: transform 0.2s ease;
+        cursor: pointer;
+      }
+      
+      .thumbnail:hover, .thumbnail:active {
+        transform: scale(1.05);
+      }
+      
+      .shutter-button {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: none;
+        border: 5px solid #fff;
+        position: relative;
+        cursor: pointer;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        margin: 0;
+        z-index: 55;
+        touch-action: manipulation;
+        transform: translateY(-10px);
+      }
+      
+      .shutter-button:active {
+        transform: translateY(-10px) scale(0.95);
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+      }
+      
+      .shutter-button::before {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        border-radius: 50%;
+        background-color: rgba(255, 255, 255, 0.2);
+        z-index: -1;
+      }
+      
+      .shutter-button::after {
+        content: '';
+        position: absolute;
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background-color: #fff;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        margin: auto;
+        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+      
+      .camera-switch {
+        position: absolute;
+        right: 30px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background-color: rgba(60, 60, 60, 0.9);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+        transition: transform 0.2s ease, background-color 0.2s ease;
+        z-index: 5;
+        touch-action: manipulation;
+      }
+      
+      .camera-switch:hover, .camera-switch:active {
+        transform: scale(1.05);
+        background-color: rgba(255, 255, 255, 0.3);
+      }
+      
+      .camera-switch svg {
+        width: 24px;
+        height: 24px;
+        fill: #fff;
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+      }
+      
+      .focus-indicator {
+        position: absolute;
+        width: 80px;
+        height: 80px;
+        border: 2px solid #ffcc00;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        display: none;
+        pointer-events: none;
+      }
+      
+      .flash-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #fff;
+        opacity: 0;
+        pointer-events: none;
+        z-index: 3;
+        transition: opacity 0.15s cubic-bezier(0.4, 0.0, 0.2, 1);
+      }
+      
+      #captured-image {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: 1;
+        display: none;
+      }
+      
+      .loading-indicator {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        border: 4px solid rgba(255, 255, 255, 0.2);
+        border-top: 4px solid #fff;
+        animation: spin 1s linear infinite;
+        z-index: 4;
+        display: none;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+      }
+      
+      .loading-text {
+        position: absolute;
+        top: calc(50% + 60px);
+        left: 50%;
+        transform: translateX(-50%);
+        color: white;
+        font-size: 16px;
+        font-weight: 500;
+        white-space: nowrap;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+        z-index: 4;
+        display: none;
+        background-color: rgba(0, 0, 0, 0.5);
+        padding: 8px 16px;
+        border-radius: 20px;
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+      }
+      
+      @keyframes spin {
+        0% { transform: translate(-50%, -50%) rotate(0deg); }
+        100% { transform: translate(-50%, -50%) rotate(360deg); }
+      }
+      
+      .status-text {
+        position: absolute;
+        bottom: 160px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80%;
+        max-width: 340px;
+        text-align: center;
+        font-size: 15px;
+        color: #fff;
+        z-index: 2;
+        background-color: rgba(0, 0, 0, 0.7);
+        padding: 12px 16px;
+        border-radius: 12px;
+        display: none;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        animation: fadeIn 0.3s ease;
+      }
+      
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+        to { opacity: 1; transform: translateX(-50%) translateY(0); }
+      }
+      
+      .app-title {
+        position: absolute;
+        top: 20px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 20px;
+        font-weight: bold;
+        color: #fff;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+        z-index: 2;
+        letter-spacing: 0.5px;
+      }
+      
+      .save-button {
+        position: absolute;
+        bottom: 160px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 10px 20px;
+        background-color: rgba(0, 0, 0, 0.6);
+        color: #fff;
+        border: none;
+        border-radius: 24px;
+        font-size: 15px;
+        font-weight: 500;
+        z-index: 3;
+        display: none;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        transition: transform 0.2s ease, background-color 0.2s ease;
+        cursor: pointer;
+      }
+      
+      .save-button:hover, .save-button:active {
+        transform: translateX(-50%) scale(1.05);
+        background-color: rgba(0, 0, 0, 0.7);
+      }
+
+      .debug-section {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 5px;
+        background-color: rgba(0, 0, 0, 0.7);
+        font-size: 10px;
+        color: #aaa;
+        display: none;
+        z-index: 5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="camera-container">
+      <div class="viewfinder">
+        <video class="camera-feed" id="camera-feed" autoplay playsinline></video>
+        <img id="captured-image" />
+        <div class="focus-indicator" id="focus-indicator"></div>
+        <div class="flash-overlay" id="flash-overlay"></div>
+        <div class="loading-indicator" id="loading-indicator"></div>
+        <div class="loading-text" id="loading-text">Time traveling...</div>
+        <div class="status-text" id="status-text"></div>
+        <button class="save-button" id="save-button">Save Photo</button>
+      </div>
+      
+      <div class="top-controls">
+        <!-- Removed buttons from the top corners -->
+      </div>
+      
+      
+      <!-- Time periods container removed, using only the mode selector -->
+      
+      <div class="bottom-controls">
+      <div class="mode-selector">
+        <div class="modes">
+          <!-- Mode selector items will be loaded dynamically -->
+        </div>
+      </div>
+      
+      <div class="controls-row">
+        <img class="thumbnail" id="thumbnail" />
+        <button class="shutter-button" id="shutter-button"></button>
+        <button class="camera-switch" id="camera-switch">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10-4.48,10-10S17.52,2,12,2z M12,20c-4.41,0-8-3.59-8-8s3.59-8,8-8s8,3.59,8,8 S16.41,20,12,20z"/>
+            <path d="M7.88,7.88L5.76,10l2.12,2.12l1.41-1.41L8.5,10l0.79-0.79L7.88,7.88z"/>
+            <path d="M16.12,7.88l-1.41,1.41L15.5,10l-0.79,0.79l1.41,1.41L18.24,10L16.12,7.88z"/>
+            <path d="M10,15.5v-2h4v2H10z"/>
+            <path d="M10,10.5v-2h4v2H10z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+      
+      <div class="debug-section" id="debug-section">
+        <div id="debug-info">Debug info will appear here</div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', async () => {
+        console.log("DOM Content Loaded - initializing camera app");
+        const cameraFeed = document.getElementById('camera-feed');
+        const capturedImage = document.getElementById('captured-image');
+        const shutterButton = document.getElementById('shutter-button');
+        const focusIndicator = document.getElementById('focus-indicator');
+        const flashOverlay = document.getElementById('flash-overlay');
+        const viewfinder = document.querySelector('.viewfinder');
+        const thumbnail = document.getElementById('thumbnail');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const loadingText = document.getElementById('loading-text');
+        const statusText = document.getElementById('status-text');
+        const timePeriodsContainer = document.querySelector('.time-periods-container');
+        const timePeriodsElement = document.getElementById('time-periods');
+        const saveButton = document.getElementById('save-button');
+        const debugSection = document.getElementById('debug-section');
+        const debugInfo = document.getElementById('debug-info');
+        
+        let facingMode = 'environment'; // Start with back camera
+        let lastCapturedImage = null;
+        let selectedPeriod = null;
+        let timePeriods = [];
+        let debugMode = false; // Debug mode disabled by default
+        
+        // Canvas for processing images
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Debug logging (only to console now)
+        function log(message) {
+          console.log(message);
+          // Debug section removed to match iOS camera app
+        }
+        
+        // Check if server is healthy
+        async function checkHealth() {
+          try {
+            const response = await fetch('/api/health');
+            const data = await response.json();
+            log(`Health check: ${data.status}`);
+            return data.status === 'ok';
+          } catch (error) {
+            log(`Health check failed: ${error.message}`);
+            return false;
+          }
+        }
+        
+        // Fetch time periods from API
+        async function fetchTimePeriods() {
+          try {
+            log('Fetching time periods...');
+            showStatus("Loading time periods...");
+            
+            const response = await fetch('/api/time-periods');
+            
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`Failed to fetch time periods: ${response.status} ${errorText}`);
+            }
+            
+            const data = await response.json();
+            log(`Received ${data.length} time periods`);
+            
+            if (!Array.isArray(data)) {
+              throw new Error('Invalid time periods data format');
+            }
+            
+            console.log("Time period data:", data);
+            timePeriods = data;
+            
+            // Set the first period (Jurassic) as selected by default
+            if (timePeriods.length > 0) {
+              selectedPeriod = timePeriods[0];
+              log(`Default time period selected: ${selectedPeriod.name} (first option)`);
+            }
+            
+            // Update mode selector with time periods
+            updateModeSelector(data);
+            
+            // Initialize scrolling for modes
+            setTimeout(() => {
+              initModesScroll();
+              
+              // Also scroll to selected period (first one - Jurassic)
+              const activeMode = document.querySelector('.mode.active');
+              if (activeMode) {
+                try {
+                  // Force scroll to make sure it works
+                  const modesContainer = document.querySelector('.modes');
+                  const containerWidth = modesContainer.offsetWidth;
+                  
+                  // Calculate scroll position to center the item
+                  const scrollLeft = activeMode.offsetLeft - (containerWidth - activeMode.offsetWidth) / 2;
+                  modesContainer.scrollLeft = scrollLeft;
+                  
+                  log('Scrolled to first time period (Jurassic)');
+                } catch (e) {
+                  console.warn('Error scrolling to first period:', e);
+                }
+              }
+            }, 300);
+            
+            // Hide the status message
+            setTimeout(() => {
+              statusText.style.display = 'none';
+            }, 500);
+            
+            return true;
+          } catch (error) {
+            log(`Error fetching time periods: ${error.message}`);
+            showStatus(`Failed to load time periods: ${error.message}`);
+            throw error; // Rethrow to propagate to caller
+          }
+        }
+        
+        // Update the fixed mode selector with actual time periods
+        function updateModeSelector(periods) {
+          const modes = document.querySelector('.modes');
+          if (!modes) return;
+          
+          // Clear existing modes
+          modes.innerHTML = '';
+          
+          // Add extra spacer at start to allow first item to center
+          const leftSpacer = document.createElement('div');
+          leftSpacer.style.minWidth = '50%';
+          leftSpacer.style.height = '1px';
+          leftSpacer.style.flex = '0 0 auto';
+          modes.appendChild(leftSpacer);
+          
+          // Add modes for each time period
+          periods.forEach(period => {
+            const modeElement = document.createElement('div');
+            modeElement.className = 'mode';
+            modeElement.textContent = period.name.toUpperCase();
+            modeElement.dataset.id = period.id;
+            modeElement.style.flex = '0 0 auto';
+            
+            if (selectedPeriod && selectedPeriod.id === period.id) {
+              modeElement.classList.add('active');
+            }
+            
+            // Use touchend instead of click for better mobile response
+            const handleModeSelect = () => {
+              // Set all modes inactive
+              document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
+              
+              // Set this mode active
+              modeElement.classList.add('active');
+              
+              // Update selected period directly
+              selectedPeriod = period;
+              log(`Selected time period: ${period.name}`);
+              
+              // Scroll this mode into center view
+              modeElement.scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest',
+                inline: 'center'
+              });
+            };
+            
+            // Add both click and touch events for better cross-device support
+            modeElement.addEventListener('click', handleModeSelect);
+            modeElement.addEventListener('touchend', (e) => {
+              e.preventDefault(); // Prevent default touch behavior
+              handleModeSelect();
+            });
+            
+            modes.appendChild(modeElement);
+          });
+          
+          // Add extra spacer at end to allow last item to center
+          const rightSpacer = document.createElement('div');
+          rightSpacer.style.minWidth = '50%';
+          rightSpacer.style.height = '1px';
+          rightSpacer.style.flex = '0 0 auto';
+          modes.appendChild(rightSpacer);
+        }
+        
+        // Initialize with health check and data fetching
+        async function initialize() {
+          try {
+            // Check if the server is healthy
+            const isHealthy = await checkHealth();
+            
+            if (isHealthy) {
+              log('Server is healthy, fetching time periods');
+              await fetchTimePeriods();
+            } else {
+              log('Server is not healthy, cannot initialize app');
+              showStatus('Server is not responding. Please try again later.');
+            }
+            
+            return true;
+          } catch (error) {
+            console.error("Initialization error:", error);
+            showStatus("Error connecting to server. Please refresh the page.");
+            return false;
+          }
+        }
+        
+        // Render time periods in the iOS-style UI
+        // This function is now replaced by updateModeSelector
+        function renderTimePeriods() {
+          log('Rendering time periods');
+          
+          // Now just redirects to mode selector
+          if (!timePeriods || timePeriods.length === 0) {
+            console.warn("No time periods data available yet");
+            return;
+          }
+          
+          // Select first period (Jurassic) by default if none is selected
+          if (!selectedPeriod && timePeriods.length > 0) {
+            selectedPeriod = timePeriods[0];
+            log(`Default time period selected: ${selectedPeriod.name} (first option)`);
+          }
+          
+          // Update UI based on selected period
+          updateModeSelector(timePeriods);
+        }
+        
+        // Initialize horizontal scrolling for the modes selector
+        function initModesScroll() {
+          const modesContainer = document.querySelector('.modes');
+          if (!modesContainer) {
+            console.error("Cannot find modes container element");
+            return;
+          }
+          
+          // Make sure all modes are visible and scrollable
+          const totalWidth = Array.from(modesContainer.children)
+            .reduce((total, el) => total + el.offsetWidth + 10, 0);
+          
+          // Ensure proper scrolling width
+          if (modesContainer.children.length > 0) {
+            // Add padding to ensure all items scroll into center
+            const firstItemWidth = modesContainer.children[0].offsetWidth;
+            const containerWidth = modesContainer.offsetWidth;
+            const padding = Math.max(0, (containerWidth - firstItemWidth) / 2);
+            
+            // Apply padding to items wrapper if needed
+            if (padding > 0) {
+              modesContainer.style.scrollPaddingLeft = padding + 'px';
+              modesContainer.style.scrollPaddingRight = padding + 'px';
+            }
+          }
+          
+          // Enhanced touch handling for better mobile response
+          let startX, isDragging = false;
+          
+          modesContainer.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            isDragging = true;
+          }, { passive: false });
+          
+          modesContainer.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            // Allow scrolling
+          }, { passive: true });
+          
+          modesContainer.addEventListener('touchend', (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            // Handle snap after scroll with longer timeout for mobile
+            setTimeout(updateActiveMode, 200);
+          });
+          
+          // Also handle mouseup for desktop
+          document.addEventListener('mouseup', () => {
+            if (isDragging) {
+              isDragging = false;
+              setTimeout(updateActiveMode, 200);
+            }
+          });
+          
+          // Handle scrolling to update active mode
+          modesContainer.addEventListener('scroll', () => {
+            // Debounce scroll events
+            clearTimeout(modesContainer.scrollTimeout);
+            modesContainer.scrollTimeout = setTimeout(updateActiveMode, 150);
+          });
+          
+          // Update the active mode based on scroll position
+          function updateActiveMode() {
+            const modes = Array.from(modesContainer.querySelectorAll('.mode'));
+            if (!modes.length) return;
+            
+            const containerRect = modesContainer.getBoundingClientRect();
+            const containerCenter = containerRect.left + containerRect.width / 2;
+            
+            // Find closest mode to the center
+            let closestMode = null;
+            let closestDistance = Infinity;
+            
+            modes.forEach(mode => {
+              const rect = mode.getBoundingClientRect();
+              const modeCenter = rect.left + rect.width / 2;
+              const distance = Math.abs(modeCenter - containerCenter);
+              
+              if (distance < closestDistance) {
+                closestDistance = distance;
+                closestMode = mode;
+              }
+            });
+            
+            if (closestMode) {
+              // Update the active mode
+              modes.forEach(m => m.classList.remove('active'));
+              closestMode.classList.add('active');
+              
+              // Update the selected period
+              const periodId = closestMode.dataset.id;
+              if (periodId) {
+                const period = timePeriods.find(p => p.id === periodId);
+                if (period) {
+                  selectedPeriod = period;
+                  log(`Selected time period: ${period.name}`);
+                }
+              }
+            }
+          }
+          
+          // Scroll to the active mode when available
+          setTimeout(() => {
+            const activeMode = modesContainer.querySelector('.mode.active');
+            if (activeMode) {
+              try {
+                // Force scroll to make sure it works
+                const modesContainer = document.querySelector('.modes');
+                const containerWidth = modesContainer.offsetWidth;
+                const modeRect = activeMode.getBoundingClientRect();
+                const containerRect = modesContainer.getBoundingClientRect();
+                
+                // Calculate scroll position to center the item
+                const scrollLeft = activeMode.offsetLeft - (containerWidth - modeRect.width) / 2;
+                modesContainer.scrollLeft = scrollLeft;
+                
+                log('Positioned active mode in center');
+              } catch (error) {
+                console.warn("Error scrolling to active mode:", error);
+              }
+            }
+          }, 200);
+        }
+        
+        // We've removed the dual time period selectors, this function is no longer needed
+        function selectTimePeriod(period) {
+          selectedPeriod = period;
+          log(`Selected time period: ${period.name}`);
+          
+          // Update the mode selector to match
+          document.querySelectorAll('.mode').forEach(m => {
+            m.classList.remove('active');
+            if (m.dataset.id === period.id) {
+              m.classList.add('active');
+            }
+          });
+        }
+        
+        // Initialize camera
+        async function initCamera() {
+          try {
+            log('Initializing camera...');
+            // Make sure to use a simplified approach that works more reliably
+            const constraints = {
+              video: {
+                width: { ideal: window.innerWidth },
+                height: { ideal: window.innerHeight },
+                facingMode: facingMode // Use current camera selection
+              }
+            };
+            
+            // Ensure video element is visible with proper styling
+            cameraFeed.style.display = 'block';
+            cameraFeed.style.width = '100%';
+            cameraFeed.style.height = '100%';
+            cameraFeed.style.objectFit = 'cover';
+            cameraFeed.style.zIndex = '1';
+            
+            // Request camera access
+            try {
+              const stream = await navigator.mediaDevices.getUserMedia(constraints);
+              cameraFeed.srcObject = stream;
+              
+              // Set canvas size to match video
+              cameraFeed.onloadedmetadata = () => {
+                canvas.width = cameraFeed.videoWidth;
+                canvas.height = cameraFeed.videoHeight;
+                log(`Camera initialized with resolution ${canvas.width}x${canvas.height}`);
+              };
+              
+              // Make sure video plays
+              try {
+                await cameraFeed.play();
+              } catch (playError) {
+                log(`Warning: Error playing video: ${playError.message}`);
+              }
+            } catch (streamError) {
+              log(`Error accessing camera stream: ${streamError.message}`);
+              showStatus(`Camera access denied. Please check camera permissions in your browser settings.`);
+            }
+          } catch (err) {
+            log(`Error in camera initialization: ${err.message}`);
+            showStatus(`Camera initialization failed. Please reload the page.`);
+          }
+        }
+        
+        // Initialize app first, then camera
+        (async function startApp() {
+          try {
+            // First initialize the app (fetch time periods)
+            await initialize();
+            
+            // Then initialize the camera with a slight delay
+            setTimeout(() => {
+              initCamera();
+            }, 300);
+          } catch (error) {
+            console.error("Error starting app:", error);
+            showStatus("Error starting app. Please refresh the page.");
+          }
+        })();
+        
+        // Handle tap to focus
+        viewfinder.addEventListener('click', (e) => {
+          // Don't focus if looking at captured image
+          if (capturedImage.style.display === 'block') return;
+          
+          const x = e.clientX;
+          const y = e.clientY;
+          
+          // Show focus indicator
+          focusIndicator.style.left = x + 'px';
+          focusIndicator.style.top = y + 'px';
+          focusIndicator.style.display = 'block';
+          
+          // Hide after animation
+          setTimeout(() => {
+            focusIndicator.style.display = 'none';
+          }, 1000);
+        });
+        
+        // Capture current frame from video
+        function captureFrame() {
+          ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
+          return canvas.toDataURL('image/jpeg', 0.85); // Lower quality for better performance
+        }
+        
+        // Generate time travel image
+        async function generateTimeTravel(imageData) {
+          showLoading(true);
+          
+          try {
+            if (!selectedPeriod) {
+              throw new Error('Please select a time period');
+            }
+            
+            log(`Generating time travel image for period: ${selectedPeriod.name}`);
+            
+            // Add retry logic for resilience
+            let attempts = 0;
+            const maxAttempts = 2;
+            let success = false;
+            let data;
+            
+            while (attempts < maxAttempts && !success) {
+              attempts++;
+              try {
+                log(`Attempt ${attempts} of ${maxAttempts}`);
+                
+                const response = await fetch('/api/time-travel', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    timeperiod: selectedPeriod.id,
+                    imageData: imageData
+                  })
+                });
+                
+                // Important: Clone the response before reading it
+                // to avoid the "body stream already read" error
+                const responseClone = response.clone();
+                
+                // First try to parse as JSON
+                try {
+                  data = await response.json();
+                  success = true;
+                } catch (jsonError) {
+                  // If JSON parsing fails, try to get text from the clone
+                  log("Failed to parse JSON response, trying text");
+                  const text = await responseClone.text();
+                  throw new Error(`Invalid response format: ${text}`);
+                }
+                
+                // Check HTTP status
+                if (!response.ok) {
+                  // Special handling for 503 Service Unavailable
+                  if (response.status === 503) {
+                    throw new Error("Server is busy processing your request. Please try again in a moment.");
+                  } else {
+                    throw new Error(data?.error || `HTTP error ${response.status}`);
+                  }
+                }
+                
+                success = true;
+              } catch (attemptError) {
+                log(`Attempt ${attempts} failed: ${attemptError.message}`);
+                if (attempts >= maxAttempts) {
+                  throw attemptError;
+                }
+                // Wait a bit before retrying
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              }
+            }
+            
+            if (data.success && data.image) {
+              log('Successfully received transformed image');
+              
+              // Display the image
+              log(`Image data received, type: ${typeof data.image}, length: ${data.image?.length || 'unknown'}`);
+              
+              // We don't need to hide mode selector since it's part of bottom bar now
+              
+              // Process image response from our updated API
+              if (data.image && typeof data.image === 'string') {
+                // Check if it's a data URI
+                if (data.image.startsWith('data:')) {
+                  // It's a data URI, use it directly
+                  showImage(data.image);
+                  showLoading(false);
+                  log('Using data URI directly');
+                } 
+                // Check if it's our R2 storage URL (/api/images/...)
+                else if (data.image.startsWith('/api/images/')) {
+                  log('Loading image from R2 storage: ' + data.image);
+                  
+                  // Create a full URL by adding base to the relative path
+                  const fullUrl = window.location.origin + data.image;
+                  const img = new Image();
+                  
+                  // Set a timeout to handle image loading issues
+                  const imgLoadTimeout = setTimeout(() => {
+                    log('R2 image load timed out, using original image');
+                    img.src = ''; // Cancel the loading
+                    showStatus('Could not load time-traveled image from storage');
+                    showImage(imageData);
+                    showLoading(false);
+                  }, 10000); // 10 seconds timeout
+                  
+                  img.onload = () => {
+                    clearTimeout(imgLoadTimeout);
+                    log('R2 image loaded successfully');
+                    showImage(img.src);
+                    showLoading(false);
+                  };
+                  
+                  img.onerror = (err) => {
+                    clearTimeout(imgLoadTimeout);
+                    log(`Failed to load image from R2: ${err.message || 'Unknown error'}`);
+                    showStatus('Could not load time-traveled image from storage');
+                    showImage(imageData);
+                    showLoading(false);
+                  };
+                  
+                  // Set the image source to the full URL
+                  img.src = fullUrl;
+                }
+                // Check if it's an external URL
+                else if (data.image.startsWith('http')) {
+                  // It's a URL, try to load it with a fallback plan
+                  log('Loading image from external URL: ' + data.image.substring(0, 50) + '...');
+                  
+                  const img = new Image();
+                  img.crossOrigin = "anonymous";
+                  
+                  // Set a timeout to handle image loading issues
+                  const imgLoadTimeout = setTimeout(() => {
+                    log('External image load timed out, using original image');
+                    img.src = ''; // Cancel the loading
+                    showStatus('Using original image due to timeout');
+                    showImage(imageData);
+                    showLoading(false);
+                  }, 10000); // 10 seconds timeout
+                  
+                  img.onload = () => {
+                    clearTimeout(imgLoadTimeout);
+                    log('External image loaded successfully');
+                    showImage(img.src);
+                    showLoading(false);
+                  };
+                  
+                  img.onerror = (err) => {
+                    clearTimeout(imgLoadTimeout);
+                    log(`Failed to load external image: ${err.message || 'Unknown error'}`);
+                    showStatus('Could not load external image - using original');
+                    showImage(imageData);
+                    showLoading(false);
+                  };
+                  
+                  // Set the image source to the received URL
+                  img.src = data.image;
+                } else {
+                  // Unknown format, use the original image
+                  log('Unknown image format received, using original');
+                  showStatus('Could not process image - using original');
+                  showImage(imageData);
+                  showLoading(false);
+                }
+              } else {
+                // Invalid image data, fallback to original
+                log('Invalid image data received');
+                showStatus('Invalid response - using original image');
+                showImage(imageData);
+                showLoading(false);
+              }
+            } else {
+              throw new Error(data.error || 'Failed to generate image');
+            }
+          } catch (error) {
+            log(`Error generating time travel image: ${error.message}`);
+            showStatus(`Error: ${error.message}`);
+            showLoading(false);
+          }
+        }
+        
+        // Show loading indicator
+        function showLoading(isLoading) {
+          // Show/hide both the spinner and the text
+          loadingIndicator.style.display = isLoading ? 'block' : 'none';
+          loadingText.style.display = isLoading ? 'block' : 'none';
+          
+          // Disable the shutter button while loading
+          shutterButton.disabled = isLoading;
+        }
+        
+        // Show status message
+        function showStatus(message) {
+          statusText.textContent = message;
+          statusText.style.display = 'block';
+          
+          // Hide after 5 seconds
+          setTimeout(() => {
+            statusText.style.display = 'none';
+          }, 5000);
+        }
+        
+        // Show captured image
+        function showImage(imageUrl) {
+          capturedImage.src = imageUrl;
+          capturedImage.style.display = 'block';
+          cameraFeed.style.display = 'none';
+          saveButton.style.display = 'block';
+          
+          // Set as thumbnail too
+          thumbnail.src = imageUrl;
+          lastCapturedImage = imageUrl;
+        }
+        
+        // Handle shutter button with enhanced mobile support
+        const handleShutterClick = async () => {
+          // Flash effect with smoother animation
+          flashOverlay.style.opacity = '1';
+          // Use a slightly longer flash effect that feels more natural
+          setTimeout(() => {
+            flashOverlay.style.opacity = '0';
+          }, 150);
+          
+          log('Capturing frame');
+          // Capture current frame
+          const imageData = captureFrame();
+          
+          // Add a small delay to let the flash effect complete
+          setTimeout(() => {
+            // If a time period is selected, generate time travel image
+            if (selectedPeriod) {
+              generateTimeTravel(imageData);
+            } else {
+              // Just show the normal captured image
+              showImage(imageData);
+            }
+          }, 200);
+        };
+        
+        // Add both click and touch events for better mobile support
+        shutterButton.addEventListener('click', handleShutterClick);
+        shutterButton.addEventListener('touchend', (e) => {
+          e.preventDefault();
+          handleShutterClick();
+        });
+        
+        // Camera switch functionality with enhanced mobile support
+        const cameraSwitch = document.getElementById('camera-switch');
+        
+        const handleCameraSwitch = async () => {
+          try {
+            // Toggle facingMode between 'environment' and 'user'
+            facingMode = facingMode === 'environment' ? 'user' : 'environment';
+            
+            log(`Switching camera to ${facingMode} mode`);
+            
+            // Stop current stream
+            const currentStream = cameraFeed.srcObject;
+            if (currentStream) {
+              currentStream.getTracks().forEach(track => track.stop());
+            }
+            
+            // Update constraints with new facingMode
+            const constraints = {
+              video: {
+                width: { ideal: window.innerWidth },
+                height: { ideal: window.innerHeight },
+                facingMode: facingMode
+              }
+            };
+            
+            // Request camera access with new constraints
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            cameraFeed.srcObject = stream;
+            
+            // Update canvas size for the new camera
+            cameraFeed.onloadedmetadata = () => {
+              canvas.width = cameraFeed.videoWidth;
+              canvas.height = cameraFeed.videoHeight;
+              log(`Camera switched to ${facingMode} mode with resolution ${canvas.width}x${canvas.height}`);
+            };
+            
+            // Make sure video plays
+            try {
+              await cameraFeed.play();
+            } catch (playError) {
+              log(`Warning: Error playing video after camera switch: ${playError.message}`);
+            }
+          } catch (err) {
+            log(`Error switching camera: ${err.message}`);
+            showStatus(`Could not switch camera. ${err.message}`);
+          }
+        };
+        
+        // Add both click and touch events for better mobile support
+        cameraSwitch.addEventListener('click', handleCameraSwitch);
+        cameraSwitch.addEventListener('touchend', (e) => {
+          e.preventDefault();
+          handleCameraSwitch();
+        });
+        
+        // Handle save button
+        saveButton.addEventListener('click', () => {
+          log('Saving image');
+          // Create a download link for the image
+          const link = document.createElement('a');
+          link.download = `timetravel-${selectedPeriod ? selectedPeriod.id : 'photo'}-${Date.now()}.jpg`;
+          link.href = capturedImage.src;
+          link.click();
+        });
+        
+        // Info button removed to match iOS camera app
+        
+        // Debug button removed to match iOS camera app
+        
+        // Handle thumbnail click to view last image
+        thumbnail.addEventListener('click', () => {
+          if (lastCapturedImage) {
+            showImage(lastCapturedImage);
+          }
+        });
+        
+        // Return to camera viewfinder when tapping on captured image
+        capturedImage.addEventListener('click', () => {
+          capturedImage.style.display = 'none';
+          cameraFeed.style.display = 'block';
+          saveButton.style.display = 'none';
+          
+          // Mode selector is always visible now as part of bottom bar
+        });
+      });
+    </script>
+  </body>
 </html>
