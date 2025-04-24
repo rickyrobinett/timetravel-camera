@@ -13,10 +13,7 @@ Time Travel Camera is a web-based camera application that runs on [Cloudflare Wo
 - npm or yarn
 - A [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier works fine)
 - [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) (`npm install -g wrangler`)
-- [Cloudflare R2 Storage](https://www.cloudflare.com/products/r2/) (for storing generated images)
 - An [OpenAI API key](https://platform.openai.com/api-keys)
-- A modern browser with camera access (Chrome, Firefox, Safari, Edge)
-- HTTPS for camera access when testing locally (handled by Wrangler)
 
 ## Setup
 
