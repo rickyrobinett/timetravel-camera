@@ -28,6 +28,10 @@
         display: none;
         flex-direction: column;
         overflow: hidden;
+        padding-top: env(safe-area-inset-top, 0);
+        padding-top: constant(safe-area-inset-top, 0); /* iOS 11.0 */
+        height: 100vh;
+        height: -webkit-fill-available; /* For mobile browsers */
       }
       
       .gallery-header {
@@ -38,6 +42,13 @@
         padding: 0 20px;
         background-color: rgba(0, 0, 0, 0.8);
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        margin-top: env(safe-area-inset-top, 0);
+        margin-top: constant(safe-area-inset-top, 0); /* iOS 11.0 */
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1;
       }
       
       .gallery-title {
@@ -65,16 +76,24 @@
         padding: 8px;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
+        height: calc(100vh - 60px);
+        height: calc(-webkit-fill-available - 60px); /* For mobile browsers */
+        margin-top: 60px;
+        width: 100%;
+        box-sizing: border-box;
+        position: relative;
       }
       
       .gallery-item {
-        aspect-ratio: 1/1;
+        position: relative;
+        width: 100%;
+        padding-bottom: 100%; /* This creates a square aspect ratio */
         background-color: #222;
         border-radius: 8px;
         overflow: hidden;
-        position: relative;
         cursor: pointer;
         transition: transform 0.2s ease;
+        -webkit-tap-highlight-color: transparent;
       }
       
       .gallery-item:active {
@@ -89,13 +108,15 @@
         height: 40px;
         background: rgba(0, 0, 0, 0.6);
         display: flex;
-        justify-content: space-around;
+        justify-content: center;
         align-items: center;
         transition: opacity 0.2s ease;
         opacity: 0;
+        -webkit-tap-highlight-color: transparent;
       }
       
-      .gallery-item:hover .gallery-item-actions {
+      .gallery-item:hover .gallery-item-actions,
+      .gallery-item:active .gallery-item-actions {
         opacity: 1;
       }
       
@@ -111,9 +132,17 @@
       }
       
       .gallery-img {
+        position: absolute;
+        top: 0;
+        left: 0;
         width: 100%;
         height: 100%;
         object-fit: cover;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        transform: translateZ(0); /* Force GPU acceleration */
+        backface-visibility: hidden;
       }
       
       .gallery-loading {
@@ -586,6 +615,71 @@
         display: none;
         z-index: 5;
       }
+      
+      /* New styles for full-screen image view */
+      .gallery-fullscreen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.9);
+        z-index: 101;
+        display: none;
+        flex-direction: column;
+        padding-top: env(safe-area-inset-top, 0);
+        padding-top: constant(safe-area-inset-top, 0);
+        height: 100vh;
+        height: -webkit-fill-available;
+      }
+      
+      .gallery-fullscreen-header {
+        height: 60px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 20px;
+        background-color: rgba(0, 0, 0, 0.8);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        margin-top: env(safe-area-inset-top, 0);
+        margin-top: constant(safe-area-inset-top, 0);
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1;
+      }
+      
+      .gallery-fullscreen-image {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 60px;
+        padding: 20px;
+        overflow: hidden;
+      }
+      
+      .gallery-fullscreen-image img {
+        max-width: 100%;
+        max-height: calc(100vh - 100px);
+        max-height: calc(-webkit-fill-available - 100px);
+        object-fit: contain;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      
+      .gallery-fullscreen-close {
+        color: white;
+        background: none;
+        border: none;
+        font-size: 16px;
+        padding: 8px 16px;
+        border-radius: 16px;
+        background-color: rgba(255, 255, 255, 0.2);
+        cursor: pointer;
+      }
     </style>
   </head>
   <body>
@@ -643,6 +737,17 @@
       
       <div class="debug-section" id="debug-section">
         <div id="debug-info">Debug info will appear here</div>
+      </div>
+    </div>
+
+    <!-- Add the fullscreen gallery HTML structure after the existing gallery overlay -->
+    <div class="gallery-fullscreen" id="gallery-fullscreen">
+      <div class="gallery-fullscreen-header">
+        <div class="gallery-title">View Photo</div>
+        <button class="gallery-fullscreen-close" id="gallery-fullscreen-close">Close</button>
+      </div>
+      <div class="gallery-fullscreen-image">
+        <img id="gallery-fullscreen-img" />
       </div>
     </div>
 
@@ -1565,36 +1670,9 @@
                 img.loading = 'lazy';
                 img.alt = 'Time travel photo';
                 
-                // Create actions container for share/download buttons
+                // Create actions container for download button only
                 const actionsContainer = document.createElement('div');
                 actionsContainer.className = 'gallery-item-actions';
-                
-                // Share button (only on supported browsers)
-                if (navigator.share) {
-                  const shareBtn = document.createElement('button');
-                  shareBtn.className = 'gallery-action-btn';
-                  shareBtn.textContent = 'Share';
-                  shareBtn.addEventListener('click', async (e) => {
-                    e.stopPropagation(); // Prevent image click
-                    try {
-                      // Create a fetch request to get the image as a blob
-                      const response = await fetch(image.url);
-                      const blob = await response.blob();
-                      const file = new File([blob], `timetravel-photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
-                      
-                      await navigator.share({
-                        title: 'Time Travel Photo',
-                        text: 'Check out my time travel photo!',
-                        files: [file]
-                      });
-                      log('Shared image successfully');
-                    } catch (error) {
-                      log(`Error sharing image: ${error.message}`);
-                      showStatus('Could not share image. Try downloading instead.');
-                    }
-                  });
-                  actionsContainer.appendChild(shareBtn);
-                }
                 
                 // Download button
                 const downloadBtn = document.createElement('button');
@@ -1612,15 +1690,10 @@
                 
                 // Click handler to view full image
                 item.addEventListener('click', () => {
-                  // Clear any timeout and show this image
-                  if (capturedImage.dataset.timeoutId) {
-                    clearTimeout(Number(capturedImage.dataset.timeoutId));
-                    capturedImage.dataset.timeoutId = "";
-                  }
-                  
-                  // Close gallery and show the selected image (with fromGallery=true)
-                  showImage(image.url, true);
-                  closeGallery();
+                  // Show the image in the fullscreen gallery
+                  const fullscreenImg = document.getElementById('gallery-fullscreen-img');
+                  fullscreenImg.src = image.url;
+                  document.getElementById('gallery-fullscreen').style.display = 'flex';
                 });
                 
                 item.appendChild(img);
@@ -1713,6 +1786,24 @@
           }
           
           // Mode selector is always visible now as part of bottom bar
+        });
+
+        // Add the fullscreen gallery close handler after the existing gallery close handler
+        // Gallery fullscreen close button
+        const galleryFullscreenClose = document.getElementById('gallery-fullscreen-close');
+        galleryFullscreenClose.addEventListener('click', () => {
+          document.getElementById('gallery-fullscreen').style.display = 'none';
+        });
+        
+        // Add keyboard support for fullscreen gallery (Escape to close)
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            if (document.getElementById('gallery-fullscreen').style.display === 'flex') {
+              document.getElementById('gallery-fullscreen').style.display = 'none';
+            } else if (galleryOverlay.style.display === 'flex') {
+              closeGallery();
+            }
+          }
         });
       });
     </script>
